@@ -1,7 +1,10 @@
 #Group Project 1
   #Function below combines all years into a single dataframe.
+  #.csv's to combine should be in the same directory, ideally by themselves.
   #The output has 1 added variable, 'year', which is the *start* year of that period.
     #So, 1996_97 is just 1996.
+  
+
   #Combining 1996-2019 takes ~3-4 minutes on my PC.
   #Dataframe can be saved as a single .csv, it's about 4 gigabytes.
 
@@ -18,6 +21,9 @@ file.export_name<-"all_years.csv"
 
 #Function to combine .csv's
 combine_year_data<-function(directory.import,year.start,year.end){
+  #directory.import is a string of the directory your yearly .csv's are stored in
+  #year.start and year.end are integers between 1996 and 2019 inclusive.
+  
   #Checks all files in directory.import for matching year.
   #If year matches, reads & adds a 'year' column with 4 digit integer year.
   #Combines all matching files into one dataframe & returns combined dataframe
