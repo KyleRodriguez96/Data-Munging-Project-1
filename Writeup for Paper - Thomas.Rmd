@@ -1,0 +1,204 @@
+---
+title: "Data Munging Group Project 1-FitzGerald"
+output: html_document
+---
+
+```{r eval=TRUE, echo=FALSE}
+library("data.table")
+library("RColorBrewer")
+#Make initial dataframe.  Requires function from Aggregate_Years.
+directory.import<-"C:\\File\\group_project_1\\"
+year.start<-1996
+year.end<-2019
+
+df<-combine_year_data(directory.import,year.start,year.end)
+```
+Regions, Overview
+---
+
+```{r eval=TRUE, echo=FALSE}
+#This section makes the 'Region by Number of Schools' figure
+df.region<-df[df$REGION>0 & df$REGION < 9 & df$REGION!='NULL']
+
+#region.names<-c("New England","Mid East","Great Lakes","Plains","Southeast","Southwest","Rocky Mntn","Far West") #Full names for large graph
+region.names<-c("NE","ME","GL","PL","SE","SW","RM","FW") #Abbreviations for small graphs
+for(i in 1:length(region.names)){
+  df.region$REGION[df.region$REGION==i] <- paste(i,region.names[i],sep="-")
+}
+
+df.region<-(table(df.region$REGION)/length(unique(df.region$year))) #Normalize across all 24 years of study
+barplot(df.region,
+        main="Regions by Average Number of Schools",xlab="Region",ylab="Average Number of Schools",
+        col=c('darkblue','blue','cyan','orange','yellow','red','purple','green'), legend=FALSE,beside=TRUE,
+        #fig.align="center",fig.height=12,fig.width=10
+        )
+#Clear memory
+rm(df.region)
+```
+There are two other regions in the study: region 0 refers to US service schools, region 9 refers to outlying areas/territories.  Since it is difficult to compare these with the other 8 regions, they will generally be omitted.
+
+Looking at the size of the various regions and their geographical locations, one might suppose that schools are concentrated in denser coastal areas.  We'll get to urbanization levels in each region shortly, but let's first look at coastal states VS non-coastal states:
+
+```{r eval=TRUE, echo=FALSE}
+landlocked<-c('ID','NV','MT','WY','UT','AZ','CO','NM','ND','SD','NE','KS','OK','MN','IA','MO','AR','MI','OH','KY','TN','WV','PA','VT')
+df.coastal<-df[df$REGION>0 & df$REGION < 9 & df$REGION!='NULL']
+
+region.names<-c("NE","ME","GL","PL","SE","SW","RM","FW") #Abbreviations for small graphs
+for(i in 1:length(region.names)){
+  df.coastal$REGION[df.coastal$REGION==i] <- paste(i,region.names[i],sep="-")
+}
+
+for(i in 1:length(landlocked)){
+  df.coastal$LOCALE2[df.coastal$STABBR == landlocked[i]]<-"Landlocked"
+}
+
+df.coastal$LOCALE2[df.coastal$LOCALE2 == 'NULL']<-"Coastal"
+
+coast_count.table<-table(df.coastal$LOCALE2,df.coastal$REGION)
+coast_count.table<-round(coast_count.table/length(unique(df.coastal$year))) #Normalize across all 24 years of study
+coast_prop.table<-prop.table(coast_count.table,margin=2)
+coastal.table<-cbind(coast_count.table,round(coast_prop.table,3))
+
+barplot(coast_count.table,
+        main="Regions by Coastal State Locations",xlab="Regions)",ylab="Number of Schools",
+        col=c('blue','green'),beside=FALSE)
+legend("topright", legend = c("Landlocked","Coastal"), bty="y", pch=19,  
+         col=c('blue','green'))
+#Clear Memory
+rm(df.coastal)
+```
+It should be kept in mind that this only measures whether the state the school is in has a coastline: states like Texas, which are a comparatively small coast and a lot of inland area, could well skew this data.
+
+Region & Urbanization (LOCALE)
+---
+
+Now that we've looked at our regions from a geographical perspective, let's look at our urbanization variable, LOCALE.
+
+One major limitation of LOCALE is that it was only recorded for the 2019 dataset.
+
+LOCALE, has two primary dimensions:
+A classification (City, Suburban, Town, Rural) represented in the 10's place, ascending from more urbanized to less urbanized, and a density measurement in the 1's place, ascending from more to less dense.
+
+Although the classification measurement is fairly intuitive, the density measurement is not.  In the City and Suburban classifications, density is a population measurement based on either the City, or the City the Suburb is attached to, respectively.  In fact, they use the same scale:1 for 250k+ population, 2 for 100-250k+ population, and 3 for <100k population.
+
+In the Town and Rural classifications, density is instead a measurement of distance from urbanized areas, regardless of the population of that city center.  Because of this, it is impractical to compare urbanization across this density scale: a City and Suburb of density 2 have something in common with each other, but not necessarily with a density 2 Town, or a density 2 Rural area.
+
+We therefore chose to normalize each urbanization level by it's classification, on a 1-4 scale, with 5 representing No data.
+```{r eval=TRUE, echo=FALSE}
+#Get 2019 data
+df.2019<-df[df$year==2019]
+#Filter out non-state regions
+df.2019<-subset(df.2019,df.2019$REGION>0 & df.2019$REGION<9)
+#Set null as 50: will become 5 later when we normalize the urbanization levels
+df.2019$LOCALE[df.2019$LOCALE=='NULL'] <- 50
+
+df.2019$LOCALE2[df.2019$LOCALE >= 10] <- '1-City'
+df.2019$LOCALE2[df.2019$LOCALE >= 20] <- '2-Suburb'
+df.2019$LOCALE2[df.2019$LOCALE >= 30] <- '3-Town'
+df.2019$LOCALE2[df.2019$LOCALE >= 40] <- '4-Rural'
+df.2019$LOCALE2[df.2019$LOCALE >= 50] <- '5-No Data'
+
+table.urb_levels<-(table(df.2019$LOCALE,df.2019$LOCALE2))
+coul <- brewer.pal(3, "Set2")
+barplot(table.urb_levels,
+        main="Breakdown of Normalized Urbanization Levels by Density",xlab="Urbanization Levels",ylab="Number of Schools",
+        col=c('darkblue','blue','lightblue'),beside=FALSE)
+  legend("topright", legend = c("Low Density","Medium Density","High Density"), bty="y", pch=19,  
+         col=c('lightblue','blue','darkblue'))
+```
+With our simplified urbanization measurement, we can now look at regional differences:
+```{r eval=TRUE, echo=FALSE}
+#Get 2019 data
+df.2019<-df[df$year==2019]
+#Filter out non-state regions
+df.2019<-subset(df.2019,df.2019$REGION>0 & df.2019$REGION<9)
+#Set null as 50: will become 5 later when we normalize the urbanization levels
+df.2019$LOCALE[df.2019$LOCALE=='NULL'] <- 50
+#Group Urban, Suburban, Town, Rural
+df.2019$LOCALE <- round(as.numeric(df.2019$LOCALE)/10)
+
+#Set labeling for barplot
+#region.names<-c("New England","Mid East","Great Lakes","Plains","Southeast","Southwest","Rocky Mntn","Far West") #Full names for large graph
+region.names<-c("NE","ME","GL","P","SE","SW","RM","FW") #Abbreviations for small graphs
+
+urbanization.names<-c("City","Suburban","Town","Rural","No Data")
+for(i in 1:length(region.names)){
+  df.2019$REGION[df.2019$REGION==i] <- paste(i,region.names[i],sep="-")
+}
+for(i in 1:length(urbanization.names)){
+  df.2019$LOCALE[df.2019$LOCALE==i] <- paste(i,urbanization.names[i],sep="-")
+}
+region.urbanization_table<-table(df.2019$LOCALE,df.2019$REGION)
+
+#Plot
+coul <- brewer.pal(5, "Set1")
+barplot(region.urbanization_table,
+        main="Urbanization by Region",xlab="Region",ylab="Number of Schools",
+        col=coul,beside=TRUE,
+        #fig.align="center",fig.height=12,fig.width=10
+        )
+legend("topleft", legend = c("City","Suburban","Town","Rural","No Data"), bty="n", pch=19, col=coul)
+```
+  From the above figure, we can see that Urban and Suburban locations are dominant in the majority of the regions.  Urban is the most common in all regions except Northeast & Mid East, and in that case Suburban only edges it out by a narrow margin.  Town locations are more strongly represented in the Plains region.
+  
+  Compared to our coastal graph from earlier, it is difficult to draw comparisons.  The two primarily coastal regions, New England and Far West, have little in common besides low Town/Rural representation.  The two inland regions, Plains and Rocky Mountains, are both on the smaller side, but Rocky Mountains does not share Plains's characteristic high Town representation.  All regions have high City/Urban representation, regardless of coastline.
+```{r eval=TRUE, echo=FALSE}
+#Get 2019 data
+df.2019<-df[df$year==2019]
+#Filter out non-state regions
+df.2019<-subset(df.2019,df.2019$REGION>0 & df.2019$REGION<9)
+#Set null as 50: will become 5 later when we normalize the urbanization levels
+df.2019$LOCALE[df.2019$LOCALE=='NULL'] <- 50
+#Group Urban, Suburban, Town, Rural
+df.2019$LOCALE <- round(as.numeric(df.2019$LOCALE)/10)
+#Set labeling for barplot
+region.names<-c("New England","Mid East","Great Lakes","Plains","Southeast","Southwest","Rocky Mntn","Far West") #Full names for large graph
+region.names<-c("NE","ME","GL","P","SE","SW","RM","FW") #Abbreviations for small graphs
+urbanization.names<-c("City","Suburban","Town","Rural","No Data")
+for(i in 1:length(region.names)){
+  df.2019$REGION[df.2019$REGION==i] <- paste(i,region.names[i],sep="-")
+}
+for(i in 1:length(urbanization.names)){
+  df.2019$LOCALE[df.2019$LOCALE==i] <- paste(i,urbanization.names[i],sep="-")
+}
+
+#Table of Generalized Urbanization
+print('Count of schools, by Region, in each urbanization category in 2019')
+urb.table<-table(df.2019$LOCALE,df.2019$REGION)
+urb.table
+#Proportion Table of Generalized Urbanization
+print('Proportion of schools, by Region, in each urbanization category in 2019')
+urb.prop_table<-prop.table(urb.table,margin=2)
+round(urb.prop_table,2)
+#print('Average by Region:')
+#print(paste('City proportion average:',round(mean(urb.prop_table[1,]),3),sep=''))
+#print(paste('Suburban proportion average:',round(mean(urb.prop_table[2,]),3),sep=''))
+#print(paste('Town proportion average:',round(mean(urb.prop_table[3,]),3),sep=''))
+#print(paste('Rural proportion average:',round(mean(urb.prop_table[4,]),3),sep=''))
+#print(paste('No Data proportion average:',round(mean(urb.prop_table[5,]),3),sep=''))
+
+print('Difference from mean proportion, by Region, in each urbanization category in 2019')
+urb.prop_dif<-urb.prop_table
+for(i in 1:5){
+  urb.prop_dif[i,]<-urb.prop_dif[i,]-mean(urb.prop_table[i,])
+}
+round(urb.prop_dif,2)
+
+coul <- brewer.pal(5, "Set1")
+barplot(urb.prop_dif,
+        main="Regional Variation from Average",xlab="Urbanization Levels",ylab="Var from Mean",
+        col=coul,beside=TRUE)
+#legend("topleft", legend = c("City","Suburban","Town","Rural","No Data"), bty="n", pch=19, col=coul)
+```
+Above is a graph of the difference in the proportional urbanization of each region from the mean for that urbanization level.  This helps to highlight the individual differences in each region from the previous graph: The high Suburban proportion in the northeast, high Town proportion in the plains, and now the high urbanization in the South Far West regions.
+
+However, that leaves us with the question of if and how to generalize this data.  Although urbanization data was only taken for 2019, one possible way to apply it to previous years is just to reuse the same values for each UNITID.  This presupposes that the urbanization level of most schools has no changed much in the last 24 years.
+
+In the total dataset, there are 170,026 unique UNITID/year combinations.  Of those, 131,346 are present in the 2019 data and have urbanization numbers, approx. 77%.  We can then roll the rest of the values back in as NULL/No Data, and we are left with a fully urbanized dataset.  This is more useful as a way of adding control variables to other relationships, however, since the regional trends seen above are more-or-less repeated on previous years.  Instead, we will leave urbanization as context for other regional differences.
+
+```{r eval=TRUE, echo=FALSE}
+#Apply 2019.  THIS TAKES 12+ HOURS TO RUN AND MAY FAIL.  Suggest using the .csv 'matched-only.csv' from GitHub.
+df.urb<-write_urbanization_to_all_years(df)
+rbind(table(df$REGION[df$REGION>0 & df$REGION<9]),table(df.urb$REGION))
+```
+

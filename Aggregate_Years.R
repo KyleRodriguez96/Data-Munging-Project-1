@@ -1,23 +1,21 @@
 #Group Project 1
   #Function below combines all years into a single dataframe.
   #.csv's to combine should be in the same directory, ideally by themselves.
-  #The output has 1 added variable, 'year', which is the *start* year of that period.
-    #So, 1996_97 is just 1996.
-  
+  #The output has 1 added variable, 'year', which is the *start* year of that period.  So, 1996_97 is just 1996.
 
-  #Combining 1996-2019 takes ~3-4 minutes on my PC.
-  #Dataframe can be saved as a single .csv, it's about 4 gigabytes.
-
-
-
+#Imports/Libraries required for fread
+  #install.packages("data.table")
+  library("data.table")
 
 #Parameters needed to run the combine_year_data function.
 directory.import<-"C:\\File\\group_project_1\\"
 year.start<-1996
 year.end<-2019
-#Parameters to save the output dataframe
+#Parameters to save the output dataframe as a .csv.  Output is ~4GB for 1996-2019.
 directory.export<-"C:\\File\\group_project_1\\"
 file.export_name<-"all_years.csv"
+
+
 
 #Function to combine .csv's
 combine_year_data<-function(directory.import,year.start,year.end){
@@ -27,7 +25,7 @@ combine_year_data<-function(directory.import,year.start,year.end){
   #Checks all files in directory.import for matching year.
   #If year matches, reads & adds a 'year' column with 4 digit integer year.
   #Combines all matching files into one dataframe & returns combined dataframe
-  print(paste('Start ', Sys.time()))
+  #print(paste('Start ', Sys.time()))
     if(year.end<year.start){
     print('Invalid year range.')
   }
@@ -44,7 +42,7 @@ combine_year_data<-function(directory.import,year.start,year.end){
       if(bTest){
         file.full_name<-paste(directory.import,file.name,sep="")
         
-        #input_DF<-read.csv(file.full_name) #~4 minutes for all
+        #Reading in files: use read.csv if fread not available
         input_DF<-fread(file.full_name) #3.5 minutes for all
         
         input_DF$year=year.string
@@ -58,12 +56,18 @@ combine_year_data<-function(directory.import,year.start,year.end){
       }
     }
   }
-  print(paste('Finish ', Sys.time()))
+  #print(paste('Finish ', Sys.time()))
   return(output_DF)
 }
 
-#Run function & Save output
+#Run function
 combined_DF<-combine_year_data(directory.import,year.start,year.end)
+
+#Save output
 fwrite.csv(combined_DF,paste(directory.export,file.export_name,sep=""),row.names=FALSE)
+
+
+
+
 
 
